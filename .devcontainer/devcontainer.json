@@ -1,0 +1,29 @@
+{
+    "name": "py312-uv-aws",
+    "build": { "dockerfile": "Dockerfile" },
+  
+    "mounts": [
+      "source=${localEnv:HOME}/.aws,target=/home/vscode/.aws,type=bind,consistency=cached"
+    ],
+  
+    "containerEnv": {
+      "AWS_REGION": "ap-southeast-1",
+      "UV_SYSTEM_PYTHON": "1"
+    },
+  
+    "postCreateCommand": "uv venv && uv sync",
+  
+    "customizations": {
+      "vscode": {
+        "extensions": [
+          "ms-python.python",
+          "ms-toolsai.jupyter",
+          "ms-azuretools.vscode-docker",
+          "amazonwebservices.aws-toolkit-vscode"
+        ]
+      }
+    },
+  
+    "remoteUser": "vscode"
+  }
+  
