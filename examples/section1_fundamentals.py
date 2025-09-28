@@ -17,9 +17,30 @@ tbl = ddb.Table(TABLE)
 
 # Seed related items under ONE PK
 with tbl.batch_writer() as bw:
-    bw.put_item(Item={"PK": USER_PK("u123"), "SK": PROFILE_SK("u123"), "type": "USER", "name": "Ada"})
-    bw.put_item(Item={"PK": USER_PK("u123"), "SK": ORDER_SK("20250927", "o1"), "type": "ORDER", "status": "PENDING"})
-    bw.put_item(Item={"PK": USER_PK("u123"), "SK": ORDER_SK("20250928", "o2"), "type": "ORDER", "status": "SHIPPED"})
+    bw.put_item(
+        Item={
+            "PK": USER_PK("u123"),
+            "SK": PROFILE_SK("u123"),
+            "type": "USER",
+            "name": "Ada",
+        }
+    )
+    bw.put_item(
+        Item={
+            "PK": USER_PK("u123"),
+            "SK": ORDER_SK("20250927", "o1"),
+            "type": "ORDER",
+            "status": "PENDING",
+        }
+    )
+    bw.put_item(
+        Item={
+            "PK": USER_PK("u123"),
+            "SK": ORDER_SK("20250928", "o2"),
+            "type": "ORDER",
+            "status": "SHIPPED",
+        }
+    )
 
 # Efficient: Query one partition
 resp = tbl.query(KeyConditionExpression=Key("PK").eq(USER_PK("u123")))

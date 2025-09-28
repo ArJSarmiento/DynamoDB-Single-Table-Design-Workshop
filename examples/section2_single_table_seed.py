@@ -15,9 +15,37 @@ ddb = boto3.resource("dynamodb", region_name=REGION)
 tbl = ddb.Table(TABLE)
 
 with tbl.batch_writer() as bw:
-    bw.put_item(Item={"PK": PK_USER("u200"), "SK": SK_PROFILE("u200"), "type": "USER", "email": "ada@example.org"})
-    bw.put_item(Item={"PK": PK_USER("u200"), "SK": SK_ORDER("20250925", "o100"), "type": "ORDER", "status": "PENDING"})
-    bw.put_item(Item={"PK": PK_USER("u200"), "SK": SK_ORDER("20250926", "o101"), "type": "ORDER", "status": "PENDING"})
-    bw.put_item(Item={"PK": PK_USER("u200"), "SK": SK_ORDER("20250928", "o102"), "type": "ORDER", "status": "SHIPPED"})
+    bw.put_item(
+        Item={
+            "PK": PK_USER("u200"),
+            "SK": SK_PROFILE("u200"),
+            "type": "USER",
+            "email": "ada@example.org",
+        }
+    )
+    bw.put_item(
+        Item={
+            "PK": PK_USER("u200"),
+            "SK": SK_ORDER("20250925", "o100"),
+            "type": "ORDER",
+            "status": "PENDING",
+        }
+    )
+    bw.put_item(
+        Item={
+            "PK": PK_USER("u200"),
+            "SK": SK_ORDER("20250926", "o101"),
+            "type": "ORDER",
+            "status": "PENDING",
+        }
+    )
+    bw.put_item(
+        Item={
+            "PK": PK_USER("u200"),
+            "SK": SK_ORDER("20250928", "o102"),
+            "type": "ORDER",
+            "status": "SHIPPED",
+        }
+    )
 
 print("Seeded single-table items for user u200 in", TABLE)
