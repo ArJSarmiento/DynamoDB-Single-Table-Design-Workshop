@@ -15,7 +15,7 @@ GSI = os.environ.get("GSI_GLOBAL_STATUS", "GSI2_StatusGlobal")
 
 tbl = boto3.resource("dynamodb", region_name=REGION).Table(TABLE)
 print(
-    tbl.query(
-        IndexName=GSI, KeyConditionExpression=Key("GSI2PK").eq("STATUS#PENDING")
-    )["Items"]
+    tbl.query(IndexName=GSI, KeyConditionExpression=Key("GSI2PK").eq("STATUS#PENDING"))[
+        "Items"
+    ]
 )
