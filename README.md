@@ -994,3 +994,8 @@ echo "Deleted."
 ```bash
 scripts/delete_table.sh
 ```
+
+### Stop and Delete Codespace
+Click **Code → Codespaces → Click the three dots → Stop Codespace → Delete Codespace**.
+<img width="1113" height="934" alt="image" src="https://github.com/user-attachments/assets/a5107dbc-6a50-469c-b4a4-a741f4827635" />
+
