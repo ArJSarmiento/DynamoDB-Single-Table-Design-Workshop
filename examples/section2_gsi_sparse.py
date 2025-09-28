@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 import os, time, boto3
 from boto3.dynamodb.conditions import Key
+from dotenv import load_dotenv
+
+load_dotenv()
 
 REGION = os.environ.get("AWS_REGION", "ap-southeast-1")
 TABLE = os.environ["TABLE"]
@@ -13,7 +16,7 @@ if GSI_NAME not in idx:
     client.update_table(
         TableName=TABLE,
         AttributeDefinitions=[{"AttributeName": "GSI1PK", "AttributeType": "S"}, {"AttributeName": "GSI1SK", "AttributeType": "S"}],
-        GlobalSecondaryIndexUpdates=[{"Create": {"IndexName": GSI_NAME, "KeySchema": [{"AttributeName": "GSI1PK", "KeyType": "HASH"}, {"AttributeName": "GSI1SK", "KeyType": "RANGE"}], "Projection": {"ProjectionType": "ALL"}, "ProvisionedThroughput": {"ReadCapacityUnits": 5, "WriteCapacityUnits": 5}}}]
+        GlobalSecondaryIndexUpdates=[{"Create": {"IndexName": GSI_NAME, "KeySchema": [{"AttributeName": "GSI1PK", "KeyType": "HASH"}, {"AttributeName": "GSI1SK", "KeyType": "RANGE"}], "Projection": {"ProjectionType": "ALL"}}}]
     )
     while True:
         time.sleep(3)

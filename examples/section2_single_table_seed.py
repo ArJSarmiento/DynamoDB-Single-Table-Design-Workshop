@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 import os, boto3
+from dotenv import load_dotenv
+
+load_dotenv()
 
 REGION = os.environ.get("AWS_REGION", "ap-southeast-1")
 TABLE = os.environ["TABLE"]
