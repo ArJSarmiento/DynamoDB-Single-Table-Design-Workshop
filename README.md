@@ -385,6 +385,248 @@ Run Section 3:
 uv run examples/section3_sharding.py
 ```
 
+---
+# Section 4 — Multi-tenancy on DynamoDB
+
+## 4.0 What is Multi-tenancy?
+
+Multi-tenancy means multiple customers (**tenants**) share the same app and often the same database. On DynamoDB we care about:
+
+* **Isolation**: A tenant must not see another tenant’s data.
+* **Performance**: Load from one tenant should not throttle others.
+* **Operations & cost**: Minimize tables and overhead while staying safe.
+
+---
+
+## 4.1 Deployment & Isolation Models
+
+* **Table‑per‑tenant (silo)**: simplest isolation; expensive to operate at scale.
+* **Shared table (pooled)**: one table, many tenants → lower cost/ops, but you must encode tenant identity **in the keys** and enforce **ABAC** (attribute‑based access control).
+* **Hybrid**: large/“noisy” tenants use silo; small tenants share a pooled table.
+
+---
+
+## 4.2 ABAC with `dynamodb:LeadingKeys` (Organizer Concept)
+
+**Policy idea:** Tag each principal `tenant=<id>` and restrict access so the **leading key** of every request begins with that tenant prefix:
+
+```
+TENANT#${aws:PrincipalTag/tenant}#*
+```
+
+To make this work, every base‑table **PK** and any **GSI PK** used by attendees must include `TENANT#<id>`.
+
+---
+
+## 4.3 Key Patterns for a Shared Table
+
+We’ll use these conventions:
+
+* **Table:** `WorkshopShared`
+* **PK:** `TENANT#<tid>#USER#<uid>`
+* **SK:** `PROFILE#<uid>` or `ORDER#<yyyymmdd>#<orderId>`
+* **GSI (tenant‑scoped status):**
+
+  * `GSI1PK = TENANT#<tid>#STATUS#<status>`
+  * `GSI1SK = <yyyymmdd>#<orderId>`
+    This keeps GSI queries tenant‑scoped by construction.
+
+---
+
+## 4.4 Code Example — Seed Your Tenant Namespace
+
+**File:** `examples/section4_intro_seed.py`
+
+```python
+#!/usr/bin/env python3
+import os, boto3
+from boto3.dynamodb.conditions import Key
+try:
+    from dotenv import load_dotenv; load_dotenv()
+except Exception:
+    pass
+
+REGION=os.environ.get("AWS_REGION","ap-southeast-1")
+TABLE=os.environ.get("SHARED_TABLE","WorkshopShare")
+TENANT=os.environ.get("TENANT_ID","t-037")
+
+ddb=boto3.resource("dynamodb",region_name=REGION); tbl=ddb.Table(TABLE)
+PK=lambda uid:f"TENANT#{TENANT}#USER#{uid}"
+SKP=lambda uid:f"PROFILE#{uid}"
+SKO=lambda d,oid:f"ORDER#{d}#{oid}"
+
+with tbl.batch_writer() as bw:
+    bw.put_item(Item={"PK":PK("u1"),"SK":SKP("u1"),"type":"USER","email":"u1@example.org"})
+    bw.put_item(Item={"PK":PK("u1"),"SK":SKO("20250928","o1"),"type":"ORDER","status":"PENDING",
+                    "GSI1PK":f"TENANT#{TENANT}#STATUS#PENDING","GSI1SK":"20250928#o1"})
+    bw.put_item(Item={"PK":PK("u1"),"SK":SKO("20250929","o2"),"type":"ORDER","status":"SHIPPED",
+                    "GSI1PK":f"TENANT#{TENANT}#STATUS#SHIPPED","GSI1SK":"20250929#o2"})
+
+print("Seeded namespace for", TENANT, "in", TABLE)
+print(tbl.query(KeyConditionExpression=Key("PK").eq(PK("u1")))['Items'])
+```
+
+**Run:**
+
+```bash
+export TENANT_ID=t-<your-id>
+export SHARED_TABLE=WorkshopShared
+uv run examples/section4_intro_seed.py
+```
+
+---
+
+## 4.5 Code Example — Verify Isolation (Attempt Cross‑Tenant Access)
+
+**File:** `examples/section4_cross_tenant_attempt.py`
+
+```python
+#!/usr/bin/env python3
+import os, boto3
+from botocore.exceptions import ClientError
+try:
+    from dotenv import load_dotenv; load_dotenv()
+except Exception:
+    pass
+
+REGION=os.environ.get("AWS_REGION","ap-southeast-1")
+TABLE=os.environ.get("SHARED_TABLE","WorkshopShared")
+OTHER_TENANT=os.environ.get("OTHER_TENANT_ID","t-999")
+
+tbl=boto3.resource("dynamodb",region_name=REGION).Table(TABLE)
+try:
+    resp=tbl.get_item(Key={"PK":f"TENANT#{OTHER_TENANT}#USER#u1","SK":"PROFILE#u1"})
+    print("Unexpectedly succeeded:", resp.get("Item"))
+except ClientError as e:
+    print("Expected AccessDenied ->", e.response['Error']['Code'], e.response['Error'].get('Message'))
+```
+
+**Run:**
+
+```bash
+export OTHER_TENANT_ID=t-000
+uv run examples/section4_cross_tenant_attempt.py
+```
+
+---
+
+## 4.6 Code Example — Tenant‑Scoped Status Queries (Sparse GSI)
+
+**File:** `examples/section4_gsi_status_scoped.py`
+
+```python
+#!/usr/bin/env python3
+import os, boto3
+from boto3.dynamodb.conditions import Key
+try:
+    from dotenv import load_dotenv; load_dotenv()
+except Exception:
+    pass
+
+REGION=os.environ.get("AWS_REGION","ap-southeast-1")
+TABLE=os.environ.get("SHARED_TABLE","WorkshopShared")
+GSI=os.environ.get("GSI_TENANT_STATUS","GSI1_Status")
+TENANT=os.environ.get("TENANT_ID","t-037")
+
+tbl=boto3.resource("dynamodb",region_name=REGION).Table(TABLE)
+resp=tbl.query(IndexName=GSI, KeyConditionExpression=Key("GSI1PK").eq(f"TENANT#{TENANT}#STATUS#PENDING"))
+print("Pending for", TENANT, "->", resp['Items'])
+```
+
+**Run:**
+
+```bash
+uv run examples/section4_gsi_status_scoped.py
+```
+
+---
+
+## 4.7 Optional (Admins Only): Global Cross‑Tenant GSI
+
+**File:** `examples/section4_gsi_status_global.py`
+
+```python
+#!/usr/bin/env python3
+import os, boto3
+from boto3.dynamodb.conditions import Key
+try:
+    from dotenv import load_dotenv; load_dotenv()
+except Exception:
+    pass
+
+REGION=os.environ.get("AWS_REGION","ap-southeast-1")
+TABLE=os.environ.get("SHARED_TABLE","WorkshopShared")
+GSI=os.environ.get("GSI_GLOBAL_STATUS","GSI2_StatusGlobal")
+
+tbl=boto3.resource("dynamodb",region_name=REGION).Table(TABLE)
+print(tbl.query(IndexName=GSI, KeyConditionExpression=Key("GSI2PK").eq("STATUS#PENDING"))['Items'])
+```
+
+**Run (admin role only):**
+
+```bash
+uv run examples/section4_gsi_status_global.py
+```
+
+---
+
+## 4.8 Dealing with Noisy Neighbors (Sharding Heavy Tenants)
+
+**File:** `examples/section4_tenant_sharding.py`
+
+```python
+#!/usr/bin/env python3
+import os, random, boto3
+from boto3.dynamodb.conditions import Key
+try:
+    from dotenv import load_dotenv; load_dotenv()
+except Exception:
+    pass
+
+REGION=os.environ.get("AWS_REGION","ap-southeast-1")
+TABLE=os.environ.get("SHARED_TABLE","WorkshopShared")
+TENANT=os.environ.get("TENANT_ID","t-037")
+SHARDS=["S0","S1","S2","S3"]
+
+tbl=boto3.resource("dynamodb",region_name=REGION).Table(TABLE)
+PK=lambda s:f"TENANT#{TENANT}#USER#hot#{s}"; SK=lambda t,n:f"EVENT#{t:010d}#{n:06d}"
+with tbl.batch_writer() as bw:
+    for n in range(120):
+        s=random.choice(SHARDS)
+        bw.put_item(Item={"PK":PK(s),"SK":SK(n,n),"type":"EVENT","payload":{"n":n,"shard":s}})
+items=[]
+for s in SHARDS:
+    items+=tbl.query(KeyConditionExpression=Key("PK").eq(PK(s)), ScanIndexForward=False, Limit=50)['Items']
+print("Sharded events for", TENANT, "->", len(items))
+```
+
+**Run:**
+
+```bash
+uv run examples/section4_tenant_sharding.py
+```
+
+---
+
+## 4.9 Updated Run Block (Shared Table)
+
+```bash
+export TENANT_ID=t-<your-id>
+export SHARED_TABLE=WorkshopShared
+
+uv run examples/section4_intro_seed.py
+uv run examples/section4_gsi_status_scoped.py
+
+export OTHER_TENANT_ID=t-000
+uv run examples/section4_cross_tenant_attempt.py
+
+# optional
+uv run examples/section4_tenant_sharding.py
+# admins only
+# uv run examples/section4_gsi_status_global.py
+```
+
+
 # Resource Cleanup
 ### Cleanup script for DynamoDB tables: `scripts/delete_table.sh`
 
