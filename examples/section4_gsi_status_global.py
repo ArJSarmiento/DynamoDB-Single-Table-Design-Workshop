@@ -14,6 +14,9 @@ TABLE = os.environ.get("SHARED_TABLE", "WorkshopShared")
 GSI = os.environ.get("GSI_GLOBAL_STATUS", "GSI2_StatusGlobal")
 
 tbl = boto3.resource("dynamodb", region_name=REGION).Table(TABLE)
+
+# Admin query: Find ALL pending orders across ALL tenants
+print("Global pending orders across all tenants:")
 print(
     tbl.query(IndexName=GSI, KeyConditionExpression=Key("GSI2PK").eq("STATUS#PENDING"))[
         "Items"

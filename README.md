@@ -493,7 +493,7 @@ uv run examples/section3_sharding.py
 
 Multi-tenancy means multiple customers (**tenants**) share the same app and often the same database. On DynamoDB we care about:
 
-* **Isolation**: A tenant must not see another tenant’s data.
+* **Isolation**: A tenant must not see another tenant's data.
 * **Performance**: Load from one tenant should not throttle others.
 * **Operations & cost**: Minimize tables and overhead while staying safe.
 
@@ -503,17 +503,28 @@ Multi-tenancy means multiple customers (**tenants**) share the same app and ofte
 
 * **Table‑per‑tenant (silo)**: simplest isolation; expensive to operate at scale.
 * **Shared table (pooled)**: one table, many tenants → lower cost/ops, but you must encode tenant identity **in the keys** and enforce **ABAC** (attribute‑based access control).
-* **Hybrid**: large/“noisy” tenants use silo; small tenants share a pooled table.
+* **Hybrid**: large/"noisy" tenants use silo; small tenants share a pooled table.
 
 ---
 
-## 4.2 ABAC with `dynamodb:LeadingKeys` (Organizer Concept)
+## 4.2 ABAC with `dynamodb:LeadingKeys` (Core Security Concept)
 
 **Policy idea:** Tag each principal `tenant=<id>` and restrict access so the **leading key** of every request begins with that tenant prefix:
 
+```json
+{
+  "Condition": {
+    "ForAllValues:StringLike": {
+      "dynamodb:LeadingKeys": ["TENANT#${aws:PrincipalTag/tenant}#*"]
+    }
+  }
+}
 ```
-TENANT#${aws:PrincipalTag/tenant}#*
-```
+
+**How it works:**
+- Every DynamoDB operation checks if the partition key starts with your tenant prefix
+- If you're tagged as `tenant=t-037`, you can only access keys starting with `TENANT#t-037#`
+- This prevents cross-tenant data access at the IAM policy level
 
 To make this work, every base‑table **PK** and any **GSI PK** used by attendees must include `TENANT#<id>`.
 
@@ -521,20 +532,29 @@ To make this work, every base‑table **PK** and any **GSI PK** used by attendee
 
 ## 4.3 Key Patterns for a Shared Table
 
-We’ll use these conventions:
+We'll use these conventions to ensure tenant isolation:
 
 * **Table:** `WorkshopShared`
-* **PK:** `TENANT#<tid>#USER#<uid>`
-* **SK:** `PROFILE#<uid>` or `ORDER#<yyyymmdd>#<orderId>`
-* **GSI (tenant‑scoped status):**
+* **Base Table PK:** `TENANT#<tid>#USER#<uid>` (groups user data by tenant)
+* **Base Table SK:** `PROFILE#<uid>` or `ORDER#<yyyymmdd>#<orderId>` (sorts by entity type and date)
+* **GSI1 (tenant‑scoped status):**
+  * `GSI1PK = TENANT#<tid>#STATUS#<status>` (tenant-scoped status queries)
+  * `GSI1SK = <yyyymmdd>#<orderId>` (chronological sorting)
+* **GSI2 (admin-only global status):**
+  * `GSI2PK = STATUS#<status>` (cross-tenant status queries)
+  * `GSI2SK = <tid>#<yyyymmdd>#<orderId>` (tenant and date sorting)
 
-  * `GSI1PK = TENANT#<tid>#STATUS#<status>`
-  * `GSI1SK = <yyyymmdd>#<orderId>`
-    This keeps GSI queries tenant‑scoped by construction.
+**Key Design Principles:**
+- **Tenant prefix first**: Ensures ABAC policies work correctly
+- **Entity hierarchy**: USER → PROFILE/ORDER maintains relationships
+- **Sparse GSIs**: Only items with status populate the status indexes
+- **Sortable keys**: Date-based sorting for time-series queries
 
 ---
 
 ## 4.4 Code Example — Seed Your Tenant Namespace
+
+**Purpose:** Create sample data in your tenant's isolated namespace to demonstrate the multi-tenant data model.
 
 **File:** `examples/section4_intro_seed.py`
 
@@ -545,7 +565,6 @@ from boto3.dynamodb.conditions import Key
 
 try:
     from dotenv import load_dotenv
-
     load_dotenv()
 except Exception:
     pass
@@ -556,34 +575,40 @@ TENANT = os.environ.get("TENANT_ID", "t-037")
 
 ddb = boto3.resource("dynamodb", region_name=REGION)
 tbl = ddb.Table(TABLE)
+
+# Key generation functions - notice the tenant prefix in every PK
 PK = lambda uid: f"TENANT#{TENANT}#USER#{uid}"
 SKP = lambda uid: f"PROFILE#{uid}"
 SKO = lambda d, oid: f"ORDER#{d}#{oid}"
 
 with tbl.batch_writer() as bw:
+    # User profile item
     bw.put_item(
         Item={
-            "PK": PK("u1"),
-            "SK": SKP("u1"),
+            "PK": PK("u1"),              # TENANT#t-037#USER#u1
+            "SK": SKP("u1"),             # PROFILE#u1
             "type": "USER",
             "email": "u1@example.org",
         }
     )
+    # Order 1 - includes GSI1 attributes for status queries
     bw.put_item(
         Item={
-            "PK": PK("u1"),
-            "SK": SKO("20250928", "o1"),
+            "PK": PK("u1"),              # Same PK groups user and orders
+            "SK": SKO("20250928", "o1"), # ORDER#20250928#o1
             "type": "ORDER",
             "status": "PENDING",
+            # GSI1 attributes for tenant-scoped status queries
             "GSI1PK": f"TENANT#{TENANT}#STATUS#PENDING",
             "GSI1SK": "20250928#o1",
         }
     )
+    # Order 2 - different status
     bw.put_item(
         Item={
             "PK": PK("u1"),
             "SK": SKO("20250929", "o2"),
-            "type": "ORDER",
+            "type": "ORDER", 
             "status": "SHIPPED",
             "GSI1PK": f"TENANT#{TENANT}#STATUS#SHIPPED",
             "GSI1SK": "20250929#o2",
@@ -591,8 +616,15 @@ with tbl.batch_writer() as bw:
     )
 
 print("Seeded namespace for", TENANT, "in", TABLE)
+# Query all items for this user (profile + orders in one query)
 print(tbl.query(KeyConditionExpression=Key("PK").eq(PK("u1")))["Items"])
 ```
+
+**What this demonstrates:**
+- **Tenant isolation by design**: Every PK starts with `TENANT#<id>#`
+- **Item collection pattern**: User profile and orders share the same PK
+- **GSI population**: Orders include GSI1 attributes for status-based queries
+- **Efficient reads**: One query returns user + all their orders
 
 **Run:**
 
@@ -606,6 +638,8 @@ uv run examples/section4_intro_seed.py
 
 ## 4.5 Code Example — Verify Isolation (Attempt Cross‑Tenant Access)
 
+**Purpose:** Test that ABAC policies prevent accessing another tenant's data, demonstrating security isolation.
+
 **File:** `examples/section4_cross_tenant_attempt.py`
 
 ```python
@@ -615,7 +649,6 @@ from botocore.exceptions import ClientError
 
 try:
     from dotenv import load_dotenv
-
     load_dotenv()
 except Exception:
     pass
@@ -626,17 +659,31 @@ OTHER_TENANT = os.environ.get("OTHER_TENANT_ID", "t-999")
 
 tbl = boto3.resource("dynamodb", region_name=REGION).Table(TABLE)
 try:
+    # Attempt to read another tenant's data
+    # This should FAIL if ABAC policies are working correctly
     resp = tbl.get_item(
         Key={"PK": f"TENANT#{OTHER_TENANT}#USER#u1", "SK": "PROFILE#u1"}
     )
-    print("Unexpectedly succeeded:", resp.get("Item"))
+    print("🚨 SECURITY ISSUE - Unexpectedly succeeded:", resp.get("Item"))
+    print("This means tenant isolation is NOT working!")
 except ClientError as e:
+    print("✅ Security working correctly!")
     print(
         "Expected AccessDenied ->",
         e.response["Error"]["Code"],
         e.response["Error"].get("Message"),
     )
 ```
+
+**What this demonstrates:**
+- **Security validation**: Attempts to access data outside your tenant namespace
+- **ABAC in action**: IAM policy with `dynamodb:LeadingKeys` should block this request
+- **Expected behavior**: Should fail with `AccessDeniedException` when policies are configured
+- **Troubleshooting**: If this succeeds, your IAM role has too broad permissions
+
+**Expected outcomes:**
+- ✅ **With restricted role**: `AccessDeniedException` - tenant isolation working
+- ❌ **With PowerUser/Admin role**: Success - bypasses tenant isolation
 
 **Run:**
 
@@ -649,6 +696,8 @@ uv run examples/section4_cross_tenant_attempt.py
 
 ## 4.6 Code Example — Tenant‑Scoped Status Queries (Sparse GSI)
 
+**Purpose:** Query orders by status within your tenant using GSI1, demonstrating how sparse indexes enable efficient cross-entity queries while maintaining tenant isolation.
+
 **File:** `examples/section4_gsi_status_scoped.py`
 
 ```python
@@ -658,7 +707,6 @@ from boto3.dynamodb.conditions import Key
 
 try:
     from dotenv import load_dotenv
-
     load_dotenv()
 except Exception:
     pass
@@ -669,12 +717,32 @@ GSI = os.environ.get("GSI_TENANT_STATUS", "GSI1")
 TENANT = os.environ.get("TENANT_ID", "t-037")
 
 tbl = boto3.resource("dynamodb", region_name=REGION).Table(TABLE)
+
+# Query GSI1 for all PENDING orders in this tenant
 resp = tbl.query(
     IndexName=GSI,
     KeyConditionExpression=Key("GSI1PK").eq(f"TENANT#{TENANT}#STATUS#PENDING"),
 )
-print("Pending for", TENANT, "->", resp["Items"])
+print("Pending orders for", TENANT, "->", resp["Items"])
 ```
+
+**What this demonstrates:**
+- **Sparse GSI pattern**: Only ORDER items (not USER profiles) populate GSI1
+- **Tenant-scoped queries**: GSI1PK includes tenant prefix, maintaining isolation
+- **Status-based access pattern**: "Find all pending orders for my tenant"
+- **Efficient cross-entity queries**: Query orders across all users in your tenant
+- **ABAC compliance**: GSI1PK starts with `TENANT#<id>#`, so policies allow access
+
+**GSI1 Structure:**
+```
+GSI1PK: TENANT#t-037#STATUS#PENDING    GSI1SK: 20250928#o1
+GSI1PK: TENANT#t-037#STATUS#SHIPPED    GSI1SK: 20250929#o2
+```
+
+**Why this works:**
+- **Tenant isolation**: Can only query your tenant's status data
+- **Sparse index**: Only items with `GSI1PK` appear in the index (orders, not profiles)
+- **Sortable results**: GSI1SK allows chronological ordering of orders
 
 **Run:**
 
@@ -686,6 +754,10 @@ uv run examples/section4_gsi_status_scoped.py
 
 ## 4.7 Optional (Admins Only): Global Cross‑Tenant GSI
 
+**Purpose:** Query orders by status across ALL tenants using GSI2, demonstrating admin-level visibility that bypasses tenant isolation for operational monitoring.
+
+**⚠️ Security Note:** This GSI intentionally breaks tenant isolation for admin use cases. Regular tenant users should NOT have access to this index.
+
 **File:** `examples/section4_gsi_status_global.py`
 
 ```python
@@ -695,7 +767,6 @@ from boto3.dynamodb.conditions import Key
 
 try:
     from dotenv import load_dotenv
-
     load_dotenv()
 except Exception:
     pass
@@ -705,11 +776,48 @@ TABLE = os.environ.get("SHARED_TABLE", "WorkshopShared")
 GSI = os.environ.get("GSI_GLOBAL_STATUS", "GSI2_StatusGlobal")
 
 tbl = boto3.resource("dynamodb", region_name=REGION).Table(TABLE)
+
+# Admin query: Find ALL pending orders across ALL tenants
+print("Global pending orders across all tenants:")
 print(
     tbl.query(
         IndexName=GSI, KeyConditionExpression=Key("GSI2PK").eq("STATUS#PENDING")
     )["Items"]
 )
+```
+
+**What this demonstrates:**
+- **Cross-tenant visibility**: Admin can see orders from all tenants
+- **Global operational queries**: "Show all pending orders in the system"
+- **Different access pattern**: GSI2PK has NO tenant prefix (`STATUS#PENDING` vs `TENANT#<id>#STATUS#PENDING`)
+- **Admin-only access**: Regular tenant users can't query this GSI due to ABAC policies
+
+**GSI2 Structure (Admin View):**
+```
+GSI2PK: STATUS#PENDING    GSI2SK: t-037#20250928#o1
+GSI2PK: STATUS#PENDING    GSI2SK: t-042#20250928#o5  
+GSI2PK: STATUS#SHIPPED    GSI2SK: t-037#20250929#o2
+```
+
+**Security implications:**
+- ✅ **Admin users**: Can query GSI2 for system-wide monitoring
+- ❌ **Tenant users**: ABAC policies block access (GSI2PK doesn't start with their tenant prefix)
+- 🔧 **Data population**: Items need both GSI1 (tenant-scoped) AND GSI2 (global) attributes
+
+**Creating GSI2 (if needed):**
+```bash
+aws dynamodb update-table --table-name WorkshopShared \
+  --attribute-definitions AttributeName=GSI2PK,AttributeType=S AttributeName=GSI2SK,AttributeType=S \
+  --global-secondary-index-updates '[{
+    "Create": {
+      "IndexName": "GSI2_StatusGlobal",
+      "KeySchema": [
+        {"AttributeName": "GSI2PK", "KeyType": "HASH"},
+        {"AttributeName": "GSI2SK", "KeyType": "RANGE"}
+      ],
+      "Projection": {"ProjectionType": "ALL"}
+    }
+  }]'
 ```
 
 **Run (admin role only):**
@@ -722,6 +830,12 @@ uv run examples/section4_gsi_status_global.py
 
 ## 4.8 Dealing with Noisy Neighbors (Sharding Heavy Tenants)
 
+**Purpose:** Demonstrate how to shard high-volume tenants across multiple partition keys to prevent hot partitions while maintaining tenant isolation.
+
+**Problem:** A "noisy neighbor" tenant generates so much traffic that they exhaust their partition's throughput, potentially affecting other tenants or causing throttling.
+
+**Solution:** Shard the heavy tenant's data across multiple partition keys, then fan-out reads across all shards.
+
 **File:** `examples/section4_tenant_sharding.py`
 
 ```python
@@ -731,7 +845,6 @@ from boto3.dynamodb.conditions import Key
 
 try:
     from dotenv import load_dotenv
-
     load_dotenv()
 except Exception:
     pass
@@ -739,29 +852,71 @@ except Exception:
 REGION = os.environ.get("AWS_REGION", "ap-southeast-1")
 TABLE = os.environ.get("SHARED_TABLE", "WorkshopShared")
 TENANT = os.environ.get("TENANT_ID", "t-037")
-SHARDS = ["S0", "S1", "S2", "S3"]
+SHARDS = ["S0", "S1", "S2", "S3"]  # 4 shards to distribute load
 
 tbl = boto3.resource("dynamodb", region_name=REGION).Table(TABLE)
+
+# Sharded PK pattern: includes shard suffix
 PK = lambda s: f"TENANT#{TENANT}#USER#hot#{s}"
 SK = lambda t, n: f"EVENT#{t:010d}#{n:06d}"
+
+# Write phase: Distribute writes across shards randomly
+print(f"Writing 120 events across {len(SHARDS)} shards...")
 with tbl.batch_writer() as bw:
     for n in range(120):
-        s = random.choice(SHARDS)
+        s = random.choice(SHARDS)  # Random shard selection
         bw.put_item(
             Item={
-                "PK": PK(s),
-                "SK": SK(n, n),
+                "PK": PK(s),               # TENANT#t-037#USER#hot#S0
+                "SK": SK(n, n),            # EVENT#0000000001#000001
                 "type": "EVENT",
                 "payload": {"n": n, "shard": s},
             }
         )
+
+# Read phase: Fan-out queries across all shards
+print("Reading from all shards...")
 items = []
 for s in SHARDS:
-    items += tbl.query(
-        KeyConditionExpression=Key("PK").eq(PK(s)), ScanIndexForward=False, Limit=50
+    shard_items = tbl.query(
+        KeyConditionExpression=Key("PK").eq(PK(s)), 
+        ScanIndexForward=False,  # Newest first
+        Limit=50
     )["Items"]
-print("Sharded events for", TENANT, "->", len(items))
+    items.extend(shard_items)
+    print(f"  Shard {s}: {len(shard_items)} items")
+
+print(f"Total sharded events for {TENANT}: {len(items)}")
 ```
+
+**What this demonstrates:**
+- **Hot partition mitigation**: Spreads load across 4 partition keys instead of 1
+- **Tenant isolation maintained**: All shards still start with `TENANT#<id>#`
+- **Write distribution**: Random shard selection spreads writes evenly
+- **Fan-out reads**: Application queries all shards and merges results
+- **Performance trade-off**: More read requests but better write throughput
+
+**Sharding Strategy:**
+```
+Original:  TENANT#t-037#USER#hot
+Sharded:   TENANT#t-037#USER#hot#S0
+           TENANT#t-037#USER#hot#S1  
+           TENANT#t-037#USER#hot#S2
+           TENANT#t-037#USER#hot#S3
+```
+
+**When to use sharding:**
+- ✅ High-volume tenants causing throttling
+- ✅ Time-series data with predictable hot spots
+- ✅ When you can accept increased read complexity
+- ❌ Low-volume tenants (adds unnecessary complexity)
+- ❌ When strong consistency across shards is required
+
+**Best practices:**
+- **Few shards**: 2-8 shards typically sufficient
+- **Consistent hashing**: For predictable shard selection
+- **Monitoring**: Watch per-partition metrics to validate effectiveness
+- **Gradual rollout**: Test with one tenant before applying broadly
 
 **Run:**
 
@@ -771,23 +926,50 @@ uv run examples/section4_tenant_sharding.py
 
 ---
 
-## 4.9 Updated Run Block (Shared Table)
+## 4.9 Complete Workshop Flow (Shared Table)
+
+**Run all Section 4 examples in order to see the complete multi-tenant pattern:**
 
 ```bash
-export TENANT_ID=t-<your-id>
-export SHARED_TABLE=WorkshopShared
+# 1. Set up your tenant environment
+export TENANT_ID=t-<your-id>           # Your unique tenant ID
+export SHARED_TABLE=WorkshopShared     # Shared multi-tenant table
 
+# 2. Seed your tenant's data namespace
+echo "=== Seeding tenant data ==="
 uv run examples/section4_intro_seed.py
+
+# 3. Query your tenant's orders by status (tenant-scoped)
+echo "=== Tenant-scoped status query ==="
 uv run examples/section4_gsi_status_scoped.py
 
+# 4. Test tenant isolation (should fail with proper ABAC)
+echo "=== Testing cross-tenant access (should be blocked) ==="
 export OTHER_TENANT_ID=t-000
 uv run examples/section4_cross_tenant_attempt.py
 
-# optional
+# 5. Optional: Demonstrate tenant sharding for high-volume scenarios
+echo "=== Optional: Tenant sharding demo ==="
 uv run examples/section4_tenant_sharding.py
-# admins only
+
+# 6. Admin-only: Global cross-tenant queries (requires admin role)
+echo "=== Admin-only: Global status queries ==="
 # uv run examples/section4_gsi_status_global.py
 ```
+
+**Expected Results:**
+1. **Seed**: Creates user profile + 2 orders in your tenant namespace
+2. **Status query**: Returns pending orders for your tenant only
+3. **Cross-tenant test**: 
+   - ✅ **With ABAC**: `AccessDeniedException` (security working)
+   - ❌ **With PowerUser**: Success (bypasses tenant isolation)
+4. **Sharding**: Distributes 120 events across 4 shards, demonstrates fan-out reads
+5. **Global query**: Shows orders from all tenants (admin view only)
+
+**Troubleshooting:**
+- **Cross-tenant access succeeds**: Your IAM role has too broad permissions
+- **GSI2 not found**: Run the GSI creation command from section 4.7
+- **Access denied on own data**: Check `TENANT_ID` matches your IAM principal tag
 
 
 # Resource Cleanup

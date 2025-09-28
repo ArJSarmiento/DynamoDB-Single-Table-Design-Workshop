@@ -15,8 +15,10 @@ GSI = os.environ.get("GSI_TENANT_STATUS", "GSI1")
 TENANT = os.environ.get("TENANT_ID", "t-037")
 
 tbl = boto3.resource("dynamodb", region_name=REGION).Table(TABLE)
+
+# Query GSI1 for all PENDING orders in this tenant
 resp = tbl.query(
     IndexName=GSI,
     KeyConditionExpression=Key("GSI1PK").eq(f"TENANT#{TENANT}#STATUS#PENDING"),
 )
-print("Pending for", TENANT, "->", resp["Items"])
+print("Pending orders for", TENANT, "->", resp["Items"])
