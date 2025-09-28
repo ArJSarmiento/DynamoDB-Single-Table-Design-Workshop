@@ -162,9 +162,30 @@ tbl = ddb.Table(TABLE)
 
 # Seed related items under ONE PK
 with tbl.batch_writer() as bw:
-    bw.put_item(Item={"PK": USER_PK("u123"), "SK": PROFILE_SK("u123"), "type": "USER", "name": "Ada"})
-    bw.put_item(Item={"PK": USER_PK("u123"), "SK": ORDER_SK("20250927", "o1"), "type": "ORDER", "status": "PENDING"})
-    bw.put_item(Item={"PK": USER_PK("u123"), "SK": ORDER_SK("20250928", "o2"), "type": "ORDER", "status": "SHIPPED"})
+    bw.put_item(
+        Item={
+            "PK": USER_PK("u123"),
+            "SK": PROFILE_SK("u123"),
+            "type": "USER",
+            "name": "Ada",
+        }
+    )
+    bw.put_item(
+        Item={
+            "PK": USER_PK("u123"),
+            "SK": ORDER_SK("20250927", "o1"),
+            "type": "ORDER",
+            "status": "PENDING",
+        }
+    )
+    bw.put_item(
+        Item={
+            "PK": USER_PK("u123"),
+            "SK": ORDER_SK("20250928", "o2"),
+            "type": "ORDER",
+            "status": "SHIPPED",
+        }
+    )
 
 # Efficient: Query one partition
 resp = tbl.query(KeyConditionExpression=Key("PK").eq(USER_PK("u123")))
@@ -250,10 +271,38 @@ ddb = boto3.resource("dynamodb", region_name=REGION)
 tbl = ddb.Table(TABLE)
 
 with tbl.batch_writer() as bw:
-    bw.put_item(Item={"PK": PK_USER("u200"), "SK": SK_PROFILE("u200"), "type": "USER", "email": "ada@example.org"})
-    bw.put_item(Item={"PK": PK_USER("u200"), "SK": SK_ORDER("20250925", "o100"), "type": "ORDER", "status": "PENDING"})
-    bw.put_item(Item={"PK": PK_USER("u200"), "SK": SK_ORDER("20250926", "o101"), "type": "ORDER", "status": "PENDING"})
-    bw.put_item(Item={"PK": PK_USER("u200"), "SK": SK_ORDER("20250928", "o102"), "type": "ORDER", "status": "SHIPPED"})
+    bw.put_item(
+        Item={
+            "PK": PK_USER("u200"),
+            "SK": SK_PROFILE("u200"),
+            "type": "USER",
+            "email": "ada@example.org",
+        }
+    )
+    bw.put_item(
+        Item={
+            "PK": PK_USER("u200"),
+            "SK": SK_ORDER("20250925", "o100"),
+            "type": "ORDER",
+            "status": "PENDING",
+        }
+    )
+    bw.put_item(
+        Item={
+            "PK": PK_USER("u200"),
+            "SK": SK_ORDER("20250926", "o101"),
+            "type": "ORDER",
+            "status": "PENDING",
+        }
+    )
+    bw.put_item(
+        Item={
+            "PK": PK_USER("u200"),
+            "SK": SK_ORDER("20250928", "o102"),
+            "type": "ORDER",
+            "status": "SHIPPED",
+        }
+    )
 
 print("Seeded single-table items for user u200 in", TABLE)
 ```
@@ -266,9 +315,6 @@ print("Seeded single-table items for user u200 in", TABLE)
 #!/usr/bin/env python3
 import os, time, boto3
 from boto3.dynamodb.conditions import Key
-from dotenv import load_dotenv
-
-load_dotenv()
 
 REGION = os.environ.get("AWS_REGION", "ap-southeast-1")
 TABLE = os.environ["TABLE"]
@@ -280,21 +326,61 @@ idx = {i["IndexName"] for i in desc.get("GlobalSecondaryIndexes", []) or []}
 if GSI_NAME not in idx:
     client.update_table(
         TableName=TABLE,
-        AttributeDefinitions=[{"AttributeName": "GSI1PK", "AttributeType": "S"}, {"AttributeName": "GSI1SK", "AttributeType": "S"}],
-        GlobalSecondaryIndexUpdates=[{"Create": {"IndexName": GSI_NAME, "KeySchema": [{"AttributeName": "GSI1PK", "KeyType": "HASH"}, {"AttributeName": "GSI1SK", "KeyType": "RANGE"}], "Projection": {"ProjectionType": "ALL"}, "ProvisionedThroughput": {"ReadCapacityUnits": 5, "WriteCapacityUnits": 5}}}]
+        AttributeDefinitions=[
+            {"AttributeName": "GSI1PK", "AttributeType": "S"},
+            {"AttributeName": "GSI1SK", "AttributeType": "S"},
+        ],
+        GlobalSecondaryIndexUpdates=[
+            {
+                "Create": {
+                    "IndexName": GSI_NAME,
+                    "KeySchema": [
+                        {"AttributeName": "GSI1PK", "KeyType": "HASH"},
+                        {"AttributeName": "GSI1SK", "KeyType": "RANGE"},
+                    ],
+                    "Projection": {"ProjectionType": "ALL"},
+                }
+            }
+        ],
     )
     while True:
         time.sleep(3)
-        gsi = client.describe_table(TableName=TABLE)["Table"].get("GlobalSecondaryIndexes", [])
-        if any(i["IndexStatus"] == "ACTIVE" and i["IndexName"] == GSI_NAME for i in gsi):
+        gsi = client.describe_table(TableName=TABLE)["Table"].get(
+            "GlobalSecondaryIndexes", []
+        )
+        if any(
+            i["IndexStatus"] == "ACTIVE" and i["IndexName"] == GSI_NAME for i in gsi
+        ):
             break
 
 r = boto3.resource("dynamodb", region_name=REGION).Table(TABLE)
-r.put_item(Item={"PK": "USER#u200", "SK": "ORDER#20250928#o102", "type": "ORDER", "status": "SHIPPED", "GSI1PK": "STATUS#SHIPPED", "GSI1SK": "20250928#o102"})
-r.put_item(Item={"PK": "USER#u200", "SK": "ORDER#20250926#o101", "type": "ORDER", "status": "PENDING", "GSI1PK": "STATUS#PENDING", "GSI1SK": "20250926#o101"})
+r.put_item(
+    Item={
+        "PK": "USER#u200",
+        "SK": "ORDER#20250928#o102",
+        "type": "ORDER",
+        "status": "SHIPPED",
+        "GSI1PK": "STATUS#SHIPPED",
+        "GSI1SK": "20250928#o102",
+    }
+)
+r.put_item(
+    Item={
+        "PK": "USER#u200",
+        "SK": "ORDER#20250926#o101",
+        "type": "ORDER",
+        "status": "PENDING",
+        "GSI1PK": "STATUS#PENDING",
+        "GSI1SK": "20250926#o101",
+    }
+)
 
 print("PENDING orders across all users in personal table:")
-print(r.query(IndexName=GSI_NAME, KeyConditionExpression=Key("GSI1PK").eq("STATUS#PENDING"))["Items"])
+print(
+    r.query(
+        IndexName=GSI_NAME, KeyConditionExpression=Key("GSI1PK").eq("STATUS#PENDING")
+    )["Items"]
+)
 ```
 
 Run Section 2:
@@ -356,27 +442,42 @@ load_dotenv()
 
 REGION = os.environ.get("AWS_REGION", "ap-southeast-1")
 TABLE = os.environ["TABLE"]
-USER_ID = "hotuser"; SHARDS = ["S0","S1","S2","S3"]
+USER_ID = "hotuser"
+SHARDS = ["S0", "S1", "S2", "S3"]
 
 ddb = boto3.resource("dynamodb", region_name=REGION)
 tbl = ddb.Table(TABLE)
 
 PK = lambda s: f"USER#{USER_ID}#{s}"
-SK = lambda ts,n: f"EVENT#{ts:010d}#{n:06d}"
+SK = lambda ts, n: f"EVENT#{ts:010d}#{n:06d}"
 
 # Write across shards
 with tbl.batch_writer() as bw:
     for n in range(120):
         s = random.choice(SHARDS)
-        bw.put_item(Item={"PK": PK(s), "SK": SK(n,n), "type": "EVENT", "payload": {"n": n, "shard": s}})
+        bw.put_item(
+            Item={
+                "PK": PK(s),
+                "SK": SK(n, n),
+                "type": "EVENT",
+                "payload": {"n": n, "shard": s},
+            }
+        )
 
 # Fan-out reads and merge
 items = []
 for s in SHARDS:
-    resp = tbl.query(KeyConditionExpression=Key("PK").eq(PK(s)), ScanIndexForward=False, Limit=50)
+    resp = tbl.query(
+        KeyConditionExpression=Key("PK").eq(PK(s)), ScanIndexForward=False, Limit=50
+    )
     items.extend(resp["Items"])
 
-print("Fetched", len(items), "events across shards; first 5:", sorted(items, key=lambda x: x["SK"], reverse=True)[:5])
+print(
+    "Fetched",
+    len(items),
+    "events across shards; first 5:",
+    sorted(items, key=lambda x: x["SK"], reverse=True)[:5],
+)
 ```
 
 Run Section 3:
@@ -441,29 +542,56 @@ We’ll use these conventions:
 #!/usr/bin/env python3
 import os, boto3
 from boto3.dynamodb.conditions import Key
+
 try:
-    from dotenv import load_dotenv; load_dotenv()
+    from dotenv import load_dotenv
+
+    load_dotenv()
 except Exception:
     pass
 
-REGION=os.environ.get("AWS_REGION","ap-southeast-1")
-TABLE=os.environ.get("SHARED_TABLE","WorkshopShare")
-TENANT=os.environ.get("TENANT_ID","t-037")
+REGION = os.environ.get("AWS_REGION", "ap-southeast-1")
+TABLE = os.environ.get("SHARED_TABLE", "WorkshopShared")
+TENANT = os.environ.get("TENANT_ID", "t-037")
 
-ddb=boto3.resource("dynamodb",region_name=REGION); tbl=ddb.Table(TABLE)
-PK=lambda uid:f"TENANT#{TENANT}#USER#{uid}"
-SKP=lambda uid:f"PROFILE#{uid}"
-SKO=lambda d,oid:f"ORDER#{d}#{oid}"
+ddb = boto3.resource("dynamodb", region_name=REGION)
+tbl = ddb.Table(TABLE)
+PK = lambda uid: f"TENANT#{TENANT}#USER#{uid}"
+SKP = lambda uid: f"PROFILE#{uid}"
+SKO = lambda d, oid: f"ORDER#{d}#{oid}"
 
 with tbl.batch_writer() as bw:
-    bw.put_item(Item={"PK":PK("u1"),"SK":SKP("u1"),"type":"USER","email":"u1@example.org"})
-    bw.put_item(Item={"PK":PK("u1"),"SK":SKO("20250928","o1"),"type":"ORDER","status":"PENDING",
-                    "GSI1PK":f"TENANT#{TENANT}#STATUS#PENDING","GSI1SK":"20250928#o1"})
-    bw.put_item(Item={"PK":PK("u1"),"SK":SKO("20250929","o2"),"type":"ORDER","status":"SHIPPED",
-                    "GSI1PK":f"TENANT#{TENANT}#STATUS#SHIPPED","GSI1SK":"20250929#o2"})
+    bw.put_item(
+        Item={
+            "PK": PK("u1"),
+            "SK": SKP("u1"),
+            "type": "USER",
+            "email": "u1@example.org",
+        }
+    )
+    bw.put_item(
+        Item={
+            "PK": PK("u1"),
+            "SK": SKO("20250928", "o1"),
+            "type": "ORDER",
+            "status": "PENDING",
+            "GSI1PK": f"TENANT#{TENANT}#STATUS#PENDING",
+            "GSI1SK": "20250928#o1",
+        }
+    )
+    bw.put_item(
+        Item={
+            "PK": PK("u1"),
+            "SK": SKO("20250929", "o2"),
+            "type": "ORDER",
+            "status": "SHIPPED",
+            "GSI1PK": f"TENANT#{TENANT}#STATUS#SHIPPED",
+            "GSI1SK": "20250929#o2",
+        }
+    )
 
 print("Seeded namespace for", TENANT, "in", TABLE)
-print(tbl.query(KeyConditionExpression=Key("PK").eq(PK("u1")))['Items'])
+print(tbl.query(KeyConditionExpression=Key("PK").eq(PK("u1")))["Items"])
 ```
 
 **Run:**
@@ -484,21 +612,30 @@ uv run examples/section4_intro_seed.py
 #!/usr/bin/env python3
 import os, boto3
 from botocore.exceptions import ClientError
+
 try:
-    from dotenv import load_dotenv; load_dotenv()
+    from dotenv import load_dotenv
+
+    load_dotenv()
 except Exception:
     pass
 
-REGION=os.environ.get("AWS_REGION","ap-southeast-1")
-TABLE=os.environ.get("SHARED_TABLE","WorkshopShared")
-OTHER_TENANT=os.environ.get("OTHER_TENANT_ID","t-999")
+REGION = os.environ.get("AWS_REGION", "ap-southeast-1")
+TABLE = os.environ.get("SHARED_TABLE", "WorkshopShared")
+OTHER_TENANT = os.environ.get("OTHER_TENANT_ID", "t-999")
 
-tbl=boto3.resource("dynamodb",region_name=REGION).Table(TABLE)
+tbl = boto3.resource("dynamodb", region_name=REGION).Table(TABLE)
 try:
-    resp=tbl.get_item(Key={"PK":f"TENANT#{OTHER_TENANT}#USER#u1","SK":"PROFILE#u1"})
+    resp = tbl.get_item(
+        Key={"PK": f"TENANT#{OTHER_TENANT}#USER#u1", "SK": "PROFILE#u1"}
+    )
     print("Unexpectedly succeeded:", resp.get("Item"))
 except ClientError as e:
-    print("Expected AccessDenied ->", e.response['Error']['Code'], e.response['Error'].get('Message'))
+    print(
+        "Expected AccessDenied ->",
+        e.response["Error"]["Code"],
+        e.response["Error"].get("Message"),
+    )
 ```
 
 **Run:**
@@ -518,19 +655,25 @@ uv run examples/section4_cross_tenant_attempt.py
 #!/usr/bin/env python3
 import os, boto3
 from boto3.dynamodb.conditions import Key
+
 try:
-    from dotenv import load_dotenv; load_dotenv()
+    from dotenv import load_dotenv
+
+    load_dotenv()
 except Exception:
     pass
 
-REGION=os.environ.get("AWS_REGION","ap-southeast-1")
-TABLE=os.environ.get("SHARED_TABLE","WorkshopShared")
-GSI=os.environ.get("GSI_TENANT_STATUS","GSI1_Status")
-TENANT=os.environ.get("TENANT_ID","t-037")
+REGION = os.environ.get("AWS_REGION", "ap-southeast-1")
+TABLE = os.environ.get("SHARED_TABLE", "WorkshopShared")
+GSI = os.environ.get("GSI_TENANT_STATUS", "GSI1")
+TENANT = os.environ.get("TENANT_ID", "t-037")
 
-tbl=boto3.resource("dynamodb",region_name=REGION).Table(TABLE)
-resp=tbl.query(IndexName=GSI, KeyConditionExpression=Key("GSI1PK").eq(f"TENANT#{TENANT}#STATUS#PENDING"))
-print("Pending for", TENANT, "->", resp['Items'])
+tbl = boto3.resource("dynamodb", region_name=REGION).Table(TABLE)
+resp = tbl.query(
+    IndexName=GSI,
+    KeyConditionExpression=Key("GSI1PK").eq(f"TENANT#{TENANT}#STATUS#PENDING"),
+)
+print("Pending for", TENANT, "->", resp["Items"])
 ```
 
 **Run:**
@@ -549,17 +692,24 @@ uv run examples/section4_gsi_status_scoped.py
 #!/usr/bin/env python3
 import os, boto3
 from boto3.dynamodb.conditions import Key
+
 try:
-    from dotenv import load_dotenv; load_dotenv()
+    from dotenv import load_dotenv
+
+    load_dotenv()
 except Exception:
     pass
 
-REGION=os.environ.get("AWS_REGION","ap-southeast-1")
-TABLE=os.environ.get("SHARED_TABLE","WorkshopShared")
-GSI=os.environ.get("GSI_GLOBAL_STATUS","GSI2_StatusGlobal")
+REGION = os.environ.get("AWS_REGION", "ap-southeast-1")
+TABLE = os.environ.get("SHARED_TABLE", "WorkshopShared")
+GSI = os.environ.get("GSI_GLOBAL_STATUS", "GSI2_StatusGlobal")
 
-tbl=boto3.resource("dynamodb",region_name=REGION).Table(TABLE)
-print(tbl.query(IndexName=GSI, KeyConditionExpression=Key("GSI2PK").eq("STATUS#PENDING"))['Items'])
+tbl = boto3.resource("dynamodb", region_name=REGION).Table(TABLE)
+print(
+    tbl.query(
+        IndexName=GSI, KeyConditionExpression=Key("GSI2PK").eq("STATUS#PENDING")
+    )["Items"]
+)
 ```
 
 **Run (admin role only):**
@@ -578,25 +728,38 @@ uv run examples/section4_gsi_status_global.py
 #!/usr/bin/env python3
 import os, random, boto3
 from boto3.dynamodb.conditions import Key
+
 try:
-    from dotenv import load_dotenv; load_dotenv()
+    from dotenv import load_dotenv
+
+    load_dotenv()
 except Exception:
     pass
 
-REGION=os.environ.get("AWS_REGION","ap-southeast-1")
-TABLE=os.environ.get("SHARED_TABLE","WorkshopShared")
-TENANT=os.environ.get("TENANT_ID","t-037")
-SHARDS=["S0","S1","S2","S3"]
+REGION = os.environ.get("AWS_REGION", "ap-southeast-1")
+TABLE = os.environ.get("SHARED_TABLE", "WorkshopShared")
+TENANT = os.environ.get("TENANT_ID", "t-037")
+SHARDS = ["S0", "S1", "S2", "S3"]
 
-tbl=boto3.resource("dynamodb",region_name=REGION).Table(TABLE)
-PK=lambda s:f"TENANT#{TENANT}#USER#hot#{s}"; SK=lambda t,n:f"EVENT#{t:010d}#{n:06d}"
+tbl = boto3.resource("dynamodb", region_name=REGION).Table(TABLE)
+PK = lambda s: f"TENANT#{TENANT}#USER#hot#{s}"
+SK = lambda t, n: f"EVENT#{t:010d}#{n:06d}"
 with tbl.batch_writer() as bw:
     for n in range(120):
-        s=random.choice(SHARDS)
-        bw.put_item(Item={"PK":PK(s),"SK":SK(n,n),"type":"EVENT","payload":{"n":n,"shard":s}})
-items=[]
+        s = random.choice(SHARDS)
+        bw.put_item(
+            Item={
+                "PK": PK(s),
+                "SK": SK(n, n),
+                "type": "EVENT",
+                "payload": {"n": n, "shard": s},
+            }
+        )
+items = []
 for s in SHARDS:
-    items+=tbl.query(KeyConditionExpression=Key("PK").eq(PK(s)), ScanIndexForward=False, Limit=50)['Items']
+    items += tbl.query(
+        KeyConditionExpression=Key("PK").eq(PK(s)), ScanIndexForward=False, Limit=50
+    )["Items"]
 print("Sharded events for", TENANT, "->", len(items))
 ```
 
