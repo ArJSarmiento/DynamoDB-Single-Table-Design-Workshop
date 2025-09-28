@@ -110,6 +110,9 @@ echo "Deleted."
 ```
 
 ---
+## Pre Requisite
+**Step 1:** `uv sync --all-groups --all-extras`
+**Step 2:** `source .venv/bin/activated`
 
 ## Section 1 — Lecture Notes: DynamoDB Fundamentals & the “No Joins” Mindset
 
@@ -174,7 +177,7 @@ Run:
 
 ```bash
 export TABLE=ws-att-${ATTENDEE_ID}
-python examples/section1_fundamentals.py
+uv run examples/section1_fundamentals.py
 ```
 
 ---
@@ -290,8 +293,8 @@ print(r.query(IndexName=GSI_NAME, KeyConditionExpression=Key("GSI1PK").eq("STATU
 Run Section 2:
 
 ```bash
-python examples/section2_single_table_seed.py
-python examples/section2_gsi_sparse.py
+uv run examples/section2_single_table_seed.py
+uv run examples/section2_gsi_sparse.py
 ```
 
 ---
@@ -369,5 +372,5 @@ print("Fetched", len(items), "events across shards; first 5:", sorted(items, key
 Run Section 3:
 
 ```bash
-python examples/section3_sharding.py
+uv run examples/section3_sharding.py
 ```
