@@ -107,20 +107,6 @@ export ATTENDEE_ID=<your-id>
 export TABLE=ws-att-${ATTENDEE_ID}   # convenience env var for examples
 ```
 
-### (Optional) Cleanup script: `scripts/delete_table.sh`
-
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-: "${ATTENDEE_ID:?Set ATTENDEE_ID}"
-: "${AWS_REGION:?Set AWS_REGION}"
-TABLE="ws-att-${ATTENDEE_ID}"
-echo "Deleting ${TABLE}..."
-aws dynamodb delete-table --table-name "$TABLE"
-aws dynamodb wait table-not-exists --table-name "$TABLE"
-echo "Deleted."
-```
-
 ---
 ## Pre Requisite
 **Step 1:** `uv sync --all-groups --all-extras`
@@ -397,4 +383,19 @@ Run Section 3:
 
 ```bash
 uv run examples/section3_sharding.py
+```
+
+# Resource Cleanup
+### Cleanup script for DynamoDB tables: `scripts/delete_table.sh`
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+: "${ATTENDEE_ID:?Set ATTENDEE_ID}"
+: "${AWS_REGION:?Set AWS_REGION}"
+TABLE="ws-att-${ATTENDEE_ID}"
+echo "Deleting ${TABLE}..."
+aws dynamodb delete-table --table-name "$TABLE"
+aws dynamodb wait table-not-exists --table-name "$TABLE"
+echo "Deleted."
 ```
