@@ -804,3 +804,9 @@ aws dynamodb delete-table --table-name "$TABLE"
 aws dynamodb wait table-not-exists --table-name "$TABLE"
 echo "Deleted."
 ```
+
+**Run:**
+
+```bash
+scripts/delete_table.sh
+```
