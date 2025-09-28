@@ -148,6 +148,9 @@ echo "Deleted."
 #!/usr/bin/env python3
 import os, boto3
 from boto3.dynamodb.conditions import Key
+from dotenv import load_dotenv
+
+load_dotenv()
 
 REGION = os.environ.get("AWS_REGION", "ap-southeast-1")
 TABLE = os.environ["TABLE"]  # export TABLE=ws-att-<id>
@@ -234,6 +237,9 @@ Example app questions:
 ```python
 #!/usr/bin/env python3
 import os, boto3
+from dotenv import load_dotenv
+
+load_dotenv()
 
 REGION = os.environ.get("AWS_REGION", "ap-southeast-1")
 TABLE = os.environ["TABLE"]
@@ -262,6 +268,9 @@ print("Seeded single-table items for user u200 in", TABLE)
 #!/usr/bin/env python3
 import os, time, boto3
 from boto3.dynamodb.conditions import Key
+from dotenv import load_dotenv
+
+load_dotenv()
 
 REGION = os.environ.get("AWS_REGION", "ap-southeast-1")
 TABLE = os.environ["TABLE"]
@@ -343,6 +352,9 @@ uv run examples/section2_gsi_sparse.py
 #!/usr/bin/env python3
 import os, random, boto3
 from boto3.dynamodb.conditions import Key
+from dotenv import load_dotenv
+
+load_dotenv()
 
 REGION = os.environ.get("AWS_REGION", "ap-southeast-1")
 TABLE = os.environ["TABLE"]
