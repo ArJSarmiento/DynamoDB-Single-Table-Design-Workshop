@@ -46,6 +46,8 @@ We’ll use **GitHub Codespaces**—a browser‑based VS Code—so there’s **n
 
 1. Go to the workshop repository on GitHub.
 2. Click **Code → Codespaces → Create codespace on main**.
+   <img width="1396" height="622" alt="image" src="https://github.com/user-attachments/assets/fa3c8cad-337e-4e03-8d3b-2ac1dbd7158d" />
+
 
 ### 2) Configure AWS CLI for SSO (inside Codespaces)
 
