@@ -30,6 +30,19 @@ We’ll use **GitHub Codespaces**—a browser‑based VS Code—so there’s **n
 * **SSO voucher** (Start URL, SSO region, AWS account, role, and your Attendee ID)
 
 ### 1) Open the repo in Codespaces
+> **Note:** If you need to restart your Codespaces environment, make sure your environment variables are saved in a `.env` file so you don’t lose them.  
+>  
+> You can set this up as follows:
+> 1. Copy the provided example file:  
+>    ```bash
+>    cp .env.example .env
+>    ```
+> 2. As you create environment variables (from different sections of the setup), add them to the `.env` file.  
+> 3. After restarting Codespaces, reload the variables with:  
+>    ```bash
+>    export $(cat .env | xargs)
+>    ```
+
 
 1. Go to the workshop repository on GitHub.
 2. Click **Code → Codespaces → Create codespace on main**.
@@ -39,8 +52,7 @@ We’ll use **GitHub Codespaces**—a browser‑based VS Code—so there’s **n
 Open the terminal and run:
 
 ```bash
-aws configure sso --profile dynamodb-workshop
-aws sso login --profile dynamodb-workshop
+aws configure --profile dynamodb-workshop
 export AWS_PROFILE=dynamodb-workshop
 export AWS_REGION=ap-southeast-1
 ```
