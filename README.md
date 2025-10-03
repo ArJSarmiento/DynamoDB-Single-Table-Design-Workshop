@@ -111,8 +111,8 @@ export TABLE=ws-att-${ATTENDEE_ID}   # convenience env var for examples
 
 ---
 ## Pre Requisite
-**Step 1:** `uv sync --all-groups --all-extras`
-**Step 2:** `source .venv/bin/activate`
+* **Step 1:** `uv sync --all-groups --all-extras`
+* **Step 2:** `source .venv/bin/activate`
 
 ## Section 1 — Lecture Notes: DynamoDB Fundamentals & the “No Joins” Mindset
 
