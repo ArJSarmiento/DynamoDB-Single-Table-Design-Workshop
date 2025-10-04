@@ -402,6 +402,7 @@ Run Section 2:
 uv run examples/section2_single_table_seed.py
 uv run examples/section2_gsi_sparse.py
 ```
+> Note: Running `section2_gsi_sparse.py` will take some time. Don't be alarmed or kill the process; just wait it out.
 
 ---
 
