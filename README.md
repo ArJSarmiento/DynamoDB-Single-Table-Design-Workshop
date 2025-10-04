@@ -26,7 +26,7 @@ We’ll use **GitHub Codespaces**—a browser‑based VS Code—so there’s **n
 ### 0) Requirements
 
 * GitHub account with access to the workshop repository
-* **SSO voucher** (Start URL, SSO region, AWS account, role, and your Attendee ID)
+* **IAM User Voucher** (AWS Console Link, Username and Password)
 
 ### 1) Open the repo in Codespaces
 > **Note:** If you need to restart your Codespaces environment, make sure your environment variables are saved in a `.env` file so you don’t lose them.  
@@ -48,7 +48,7 @@ We’ll use **GitHub Codespaces**—a browser‑based VS Code—so there’s **n
    <img width="1396" height="622" alt="image" src="https://github.com/user-attachments/assets/fa3c8cad-337e-4e03-8d3b-2ac1dbd7158d" />
 
 
-### 2) Configure AWS CLI for SSO (inside Codespaces)
+### 2) Configure AWS CLI Profile (inside Codespaces)
 
 Open the terminal and run:
 
