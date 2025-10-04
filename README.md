@@ -29,15 +29,15 @@ We’ll use **GitHub Codespaces**—a browser‑based VS Code—so there’s **n
 * **IAM User Voucher** (Console Account ID, Username and Password)
 * Generate an access key and secret access key:
   * Go to the top-right account menu and then select "Security credentials"
-  ![alt text](image.png)
+  ![Secret Key](assets/secret_key_1.png)
   * Scroll down until you see the "Create Access Key" button. Select this button.  
-  ![alt text](image-1.png)
+  ![Secret Key](assets/secret_key_2.png)
   * Select "Command-line Interface", toggle the confirmation, and then hit next.
-  ![alt text](image-2.png)
+  ![Secret Key](assets/secret_key_3.png)
   * Select "Create access key"
-  ![alt text](image-3.png)
+  ![Secret Key](assets/secret_key_4.png)
   * Copy the Access Key and the Secret Access Key
-  ![alt text](image-4.png)
+  ![Secret Key](assets/secret_key_5.png)
 
 ### 1) Open the repo in Codespaces
 > **Note:** If you need to restart your Codespaces environment, make sure your environment variables are saved in a `.env` file so you don’t lose them.  
