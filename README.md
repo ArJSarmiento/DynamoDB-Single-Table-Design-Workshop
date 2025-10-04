@@ -17,8 +17,7 @@ We’ll use **GitHub Codespaces**—a browser‑based VS Code—so there’s **n
 2. Single‑table design (PK/SK, GSIs, sparse indexes)
 3. Hot partitions & write‑sharding strategies
 4. Multitenancy patterns (shared table with prefixes & ABAC)
-5. Observability (CloudWatch metrics & signals)
-6. Cleanup & cost hygiene
+5. Cleanup & cost hygiene
 
 ---
 
