@@ -26,7 +26,18 @@ We’ll use **GitHub Codespaces**—a browser‑based VS Code—so there’s **n
 ### 0) Requirements
 
 * GitHub account with access to the workshop repository
-* **IAM User Voucher** (AWS Console Link, Username and Password)
+* **IAM User Voucher** (Console Account ID, Username and Password)
+* Generate an access key and secret access key:
+  * Go to the top-right account menu and then select "Security credentials"
+  ![alt text](image.png)
+  * Scroll down until you see the "Create Access Key" button. Select this button.  
+  ![alt text](image-1.png)
+  * Select "Command-line Interface", toggle the confirmation, and then hit next.
+  ![alt text](image-2.png)
+  * Select "Create access key"
+  ![alt text](image-3.png)
+  * Copy the Access Key and the Secret Access Key
+  ![alt text](image-4.png)
 
 ### 1) Open the repo in Codespaces
 > **Note:** If you need to restart your Codespaces environment, make sure your environment variables are saved in a `.env` file so you don’t lose them.  
@@ -995,6 +1006,6 @@ scripts/delete_table.sh
 ```
 
 ### Stop and Delete Codespace
-Click **Code → Codespaces → Click the three dots → Stop Codespace → Delete Codespace**.
+Click **Code → Codespaces → Click the three dots → Stop Codespace → Delete**.
 <img width="1113" height="934" alt="image" src="https://github.com/user-attachments/assets/a5107dbc-6a50-469c-b4a4-a741f4827635" />
 
