@@ -80,6 +80,7 @@ aws sts get-caller-identity
 ## Create your personal DynamoDB table (one‑time)
 
 We’ll give each participant their **own** table named `ws-att-<ATTENDEE_ID>` so the early examples don’t depend on any shared table.
+> Note: Your `ATTENDEE_ID` is the number at the end of your IAM username. For example, if your username is `workshop_01`, your `ATTENDEE_ID` is `01`.
 
 ### Script: `scripts/create_table.sh`
 
